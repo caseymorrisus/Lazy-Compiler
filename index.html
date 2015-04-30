@@ -80,6 +80,7 @@
 			
 			try {
 				var directorypath = '' + fs.readFileSync(appdirectory + '/.directory') + '';
+				$('#holder strong').text('Directory already added. :)');
 			} catch(err) {
 				console.log("No directory set yet.");
 			}
