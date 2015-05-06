@@ -138,7 +138,8 @@
 		    chokidar = require('chokidar'),
 		    less = require('less'),
 		    coffee = require('coffee-script'),
-		    tsc = require('typescript-compiler');
+		    tsc = require('typescript-compiler'),
+		    UglifyJS = require('uglify-js');
 		//var sass = require('ruby-sass');
 
 		var options = {
@@ -146,14 +147,15 @@
 		};
 
 		var watched_files = {
-			css: 	'*.css',
-			scss: 	'*.scss',
-			less: 	'*.less',
-			styl: 	'*.styl',
-			jade: 	'*.jade',
-			html: 	'*.html',
-			coffee: '*.coffee',
-			typescript: 	'*.ts'
+			cssmin: 		'*.css',
+			scss: 			'*.scss',
+			less: 			'*.less',
+			styl: 			'*.styl',
+			jade: 			'*.jade',
+			html: 			'*.html',
+			coffee: 		'*.coffee',
+			typescript: 	'*.ts',
+			jsmin: 			"*.js"
 		};
 
 		$.each( watched_files, function(key, value) {
@@ -170,7 +172,7 @@
 		$.each( watched_files, function(key, value) {
 			//console.log( key + ": " + value + '\n');
 			switch(key) {
-				case 'css':
+				case 'cssmin':
 					if(options.minify) {
 						gaze([value, '!*.min*'],{cwd: directorypath}, function(err, watcher) {
 							function compileCss(filepath) {
@@ -312,6 +314,7 @@
 							var rawCoffee = fs.readFileSync(filepath, 'utf8');
 							var brewedCoffee = coffee.compile(rawCoffee);
 							fs.writeFileSync(fileDir + '/' + fileName + '.js', brewedCoffee)
+							addLog(true, filepath);
 						}
 						this.on('changed', function(filepath) {
 							compileCoffee(filepath);
@@ -322,7 +325,7 @@
 					});
 					break;
 				case 'typescript':
-					gaze(value, {cwd: directorypath}, function(err, water) {
+					gaze(value, {cwd: directorypath}, function(err, watcher) {
 						function compileTs(filepath) {
 							console.log("TYPESCRIPT File Changed");
 							var fileName = pathlib.basename(filepath, '.ts');
@@ -331,6 +334,7 @@
 							var js = tsc.compileString(ts);
 							console.log(js);
 							fs.writeFileSync(fileDir + '/' + fileName + '.js', js);
+							addLog(true, filepath);
 							//tsc.compile(fileName + '.ts', ['--out', fileName + '.js']);
 							//addLog(true, filepath);
 						}
@@ -341,6 +345,25 @@
 							compileTs(filepath);
 						});
 					});
+					break;
+				case 'jsmin':
+					gaze([value, '!*.min*'], {cwd: directorypath}, function(err, watcher) {
+						function minifyJs(filepath) {
+							console.log("JAVASCRIPT File Changed");
+							var fileName = pathlib.basename(filepath, '.ts');
+							var fileDir = pathlib.dirname(filepath);
+							var minJs = UglifyJS.minify(filepath);
+							fs.writeFileSync(fileDir + '/' + fileName + '.min.js', minJs.code);
+							addLog(true, filepath);
+						}
+						this.on('changed', function(filepath) {
+							minifyJs(filepath);
+						});
+						this.on('added', function(filepath) {
+							minifyJs(filepath);
+						});
+					});
+					
 					break;
 			}
 
