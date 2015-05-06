@@ -7,7 +7,8 @@
     <link href='http://fonts.googleapis.com/css?family=Stint+Ultra+Expanded' rel='stylesheet' type='text/css'>
     <link href='http://fonts.googleapis.com/css?family=Slabo+13px' rel='stylesheet' type='text/css'>
 
-    <link rel="stylesheet" type="text/css" href="style.min.css">
+	<link rel="stylesheet" href="reset.css">
+    <link rel="stylesheet" type="text/css" href="style.css">
    	<script src="jquery.js"></script>
    	
   </head>
@@ -51,42 +52,75 @@
   		<span class="help" id="edit">Help</span>
   	</div>
   	<div class="container">
-  		<div>
-		    <h1><strong>Casey Morris</strong><br> Is Really<br><strong>Awesome</strong></h1>
-		    <hr>
-		    We are using io.js <script>document.write(process.version)</script>
-		    and Electron <script>document.write(process.versions['electron'])</script>.
-		    <h4><span>Sed accumsan tellus eget arcu semper lacinia a pretium lectus. </span>Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Vivamus dignissim commodo felis, vel ultrices risus sodales eget. Praesent aliquet ipsum justo, ut viverra ligula lobortis id. Nunc sed mi id eros euismod condimentum et et nunc. Fusce a eros quis ligula congue sodales. Vestibulum faucibus, mauris in consectetur auctor, magna erat sodales nisl, ut suscipit elit mi nec sem.</h4>
+		<div class="left-column">
+			<div id="holder">
+				<strong>Drag your project directory here.</strong>
+			</div>
+			<h3><strong>File Types Watched</strong></h3>
+			<ul class="filetypes">
+
+			</ul>
 		</div>
-		<div id="holder">
-		  Drag your file here
+		<div class="right-column">
+			<h1><strong>Compile Log</strong></h1>
+			<ul id="compile-log">
+
+			</ul>
 		</div>
 
+
 		<script>
+			window.jQuery = require('jquery.js');
 			var fs = require("fs");
 			var ipc = require('ipc');
 			var pathlib = require('path');
+			var gaze = require('gaze');
 			// COMPILE LIBRARIES //
 			var jade = require('jade');
 			var shell = require('shelljs');
 			var csswring = require('csswring');
 			var chokidar = require('chokidar');
 			var less = require('less');
+			var devmode = true;
+
+			var appdirectory = ipc.sendSync('get-directory');
+			console.log("\n\nGOT DIRECTORY: " + appdirectory + "\n\n");
+
+
+			// IF DEVMODE WATCH DEV FOLDER AND LIVE RELOAD //
+
+			if (devmode) {
+				gaze(appdirectory + '/*.*', function(err, watcher) {
+					this.on('changed', function(filepath) {
+						console.log("File changed.");
+						ipc.send('reload');
+					});
+				});
+			}
+
+			// END OF DEVMODE WATCHER
 			
-			var directorypath = '' + fs.readFileSync('Electron.app/Contents/Resources/app/directory.txt') + '';
+			try {
+				var directorypath = '' + fs.readFileSync(appdirectory + '/.directory') + '';
+				$('#holder').text('');
+				$('#holder').append('<strong>Currently Watching:</strong><br>').append(directorypath);
+			} catch(err) {
+				console.log("No directory set yet.");
+			}
+
 			console.log('DIRECTORY FILE CONTENTS: ' + directorypath);
 			var holder = document.getElementById('holder');
 			holder.ondragover = function () {
 				return false;
 			};
-		  holder.ondragleave = holder.ondragend = function () {
+		    holder.ondragleave = holder.ondragend = function () {
 				return false;
 			};
 			holder.ondrop = function (e) {
 			  e.preventDefault();
 			  var file = e.dataTransfer.files[0];
-			  console.log('File you dragged here is' + pathlib.dirname(file.path));
-			  fs.writeFileSync('Electron.app/Contents/Resources/app/directory.txt', pathlib.dirname(file.path));
+			  console.log('File you dragged here is' + file.path);
+			  fs.writeFileSync(appdirectory + '/.directory', file.path);
 			  ipc.send('reload');
 			  return false;
 		  };
@@ -94,17 +128,166 @@
 	</div>
 	<script>
 		console.log('DIRECTORY FILE CONTENTS AGAIN: ' + directorypath);
-		var pathlib = require('path');
-		// COMPILE LIBRARIES //
-		var jade = require('jade');
-		var shell = require('shelljs');
-		var csswring = require('csswring');
-		var chokidar = require('chokidar');
-		var less = require('less');
+		var pathlib = require('path'),
+		    jade = require('jade'),
+		    shell = require('shelljs'),
+		    csswring = require('csswring'),
+		    chokidar = require('chokidar'),
+		    less = require('less'),
+		    coffee = require('coffee-script');
 		//var sass = require('ruby-sass');
+
+		var options = {
+			minify: 	true 
+		};
+
+		var watched_files = {
+			css: 	directorypath + '/*.css',
+			scss: 	directorypath + '/*.scss',
+			less: 	directorypath + '/*.less',
+			styl: 	directorypath + '/*.styl',
+			jade: 	directorypath + '/*.jade',
+			html: 	directorypath + '/*.html',
+			coffee: directorypath + '/*.coffee'
+		};
+
+		$.each( watched_files, function(key, value) {
+			$('.filetypes').append('<li>' + key + '</li>');
+		});
+
+		var log = $('#compile-log');
+		function addLog(compiled, message) {
+			if (compiled) {
+				log.prepend('<li>Compiled: ' + message + '</li>');
+			}
+		}
+
+		$.each( watched_files, function(key, value) {
+			//console.log( key + ": " + value + '\n');
+			switch(key) {
+				case 'css':
+					if(options.minify) {
+						gaze([value, '!' + directorypath + '/*.min*'], function(err, watcher) {
+							this.on('changed', function(filepath) {
+								console.log("\n\nCSS FILE WAS ADDED.\n\n")
+								var fileName = pathlib.basename(filepath, '.css');
+								var fileDir = pathlib.dirname(filepath);
+								shell.cd(directorypath);
+								var css = fs.readFileSync(filepath, 'utf8');
+								fs.writeFileSync(fileDir + '/' + fileName + '.min.css', csswring.wring(css).css);
+								//ipc.send('reload');
+								addLog(true, filepath);
+							});
+						});
+					}
+					break;
+				case 'scss':
+					gaze(value, function(err, watcher) {
+						this.on('changed', function(filepath) {
+							console.log("SCSS / SASS File Changed");
+							var fileName = pathlib.basename(filepath, '.scss');
+							var fileDir = pathlib.dirname(filepath);
+							shell.cd(directorypath);
+							shell.exec('node-sass ' + directorypath + '/' + fileName + '.scss ' + directorypath + '/' + fileName + '.css', {async: true}, function(code, output) {
+								if(code == 0) {
+									addLog(true, filepath);
+									if(options.minify) {
+										var css = fs.readFileSync(filepath, 'utf8');
+										fs.writeFileSync(fileDir + '/' + fileName + '.min.css', csswring.wring(css).css);
+									}
+									//ipc.send('reload');
+								} else {
+									console.log("Please install Node-Sass using npm install -g node-sass");
+								}
+							});
+						});
+					});
+					break;
+				case 'less':
+					gaze(value, function(err, watcher) {
+						this.on('changed', function(filepath) {
+							var fileName = pathlib.basename(filepath, '.less');
+							var fileDir = pathlib.dirname(filepath);
+							less.render(fs.readFileSync(filepath).toString(), {
+								filename: pathlib.resolve(filepath),
+							}, function(e,output) {
+								fs.writeFileSync(fileDir + '/' + fileName + '.css', output.css);
+							});
+							addLog(true, filepath);
+							if(options.minify) {
+								var css = fs.readFileSync(filepath, 'utf8');
+								fs.writeFileSync(fileDir + '/' + fileName + '.min.css', csswring.wring(css).css);
+							}
+						});
+					})
+					break;
+				case 'styl':
+					gaze(value, function(err, watcher) {
+						this.on('changed', function(filepath) {
+							var fileName = pathlib.basename(filepath, '.styl');
+							var fileDir = pathlib.dirname(filepath);
+							shell.cd(fileDir);
+							shell.exec('stylus ' + fileName + '.styl', {async: true}, function(code, output) {
+								if(code == 0) {
+									addLog(true, filepath);
+									//ipc.send('reload');
+									if(options.minify) {
+										var css = fs.readFileSync(filepath, 'utf8');
+										fs.writeFileSync(fileDir + '/' + fileName + '.min.css', csswring.wring(css).css);
+									}
+								} else {
+									console.log("Please install Stylus using npm install -g stylus");
+								}
+							});
+						});
+					})
+					break;
+				case 'jade':
+					gaze(value, function(err, watcher) {
+						this.on('changed', function(filepath) {
+							var fileName = pathlib.basename(filepath, '.jade');
+							var fileDir = pathlib.dirname(filepath);
+							console.log("JADE File Changed");
+							shell.cd(fileDir);
+							shell.exec('jade ' + fileName + '.jade', {async: true}, function(code, output) {
+								if(code == 0) {
+									//ipc.send('reload');
+								} else {
+									console.log("Please install Jade using npm install -g jade");
+								}
+							});
+						});
+					})
+					break;
+				case 'html':
+					gaze(value, function(err, watcher) {
+						this.on('changed', function(filepath) {
+							
+						});
+					})
+					break;
+				case 'coffee':
+					gaze(value, function(err, watcher) {
+						this.on('changed', function(filepath) {
+							console.log("COFFEE File Changed");
+							var fileName = pathlib.basename(filepath, '.coffee');
+							var fileDir = pathlib.dirname(filepath);
+							shell.cd(directorypath);
+							fs.readFileSync(fileName + '.coffee', 'utf8', function(err, data) {
+								compiled = coffee.compile(data);
+								fs.writeFileSync(fileName + '.js', compiled, function(err) {
+									console.log("Compiled to JS.");
+								});
+							});
+						});
+					});
+					break;
+			}
+
+		});
 		
 
-		chokidar.watch(directorypath, {ignored: /[\/\\]\./}).on('change', function(event, path) {
+		/*chokidar.watch(directorypath, {ignored: /[\/\\]\./}).on('change', function(event, path) {
 			var ext = pathlib.extname(event);
 			var filename = pathlib.basename(event);
 			var base = pathlib.basename(event, ext);
@@ -116,7 +299,7 @@
 					case '.css':
 						console.log("CSS File Changed");
 						shell.cd(directorypath);
-						var css = fs.readFileSync(filename, 'utf8');
+						var css = fs.readFileSync(directorypath + '/' + filename, 'utf8');
 						fs.writeFileSync(directorypath + '/' + base + '.min.css', csswring.wring(css).css);
 						ipc.send('reload');
 						break;
@@ -169,7 +352,7 @@
 				}
 			}
 			
-		});
+		});*/
 
 		var closeBtn = document.getElementById('close');
 		closeBtn.addEventListener('click', function() {

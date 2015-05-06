@@ -1,8 +1,9 @@
 var app = require('app');  // Module to control application life.
 var BrowserWindow = require('browser-window');  // Module to create native browser window.
 
-//console.log("APP PATH HOME " + app.getPath('home'));
+//console.log("APP PATH HOME " + __dirname);
 
+ 
 
 // Report crashes to our server.
 require('crash-reporter').start();
@@ -67,6 +68,11 @@ app.on('ready', function() {
     } else {
       mainWindow.setKiosk(true);
     }
+  });
+
+  ipc.on('get-directory', function(event) {
+    //event.sender.send('got-directory', __dirname);
+    event.returnValue = __dirname;
   });
 
   
