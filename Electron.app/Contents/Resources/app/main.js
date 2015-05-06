@@ -1,7 +1,8 @@
 var app = require('app');  // Module to control application life.
 var BrowserWindow = require('browser-window');  // Module to create native browser window.
-
+var browserSync = require('browser-sync');
 //console.log("APP PATH HOME " + __dirname);
+
 
  
 
@@ -41,6 +42,18 @@ app.on('ready', function() {
   });
 
   var ipc = require('ipc');
+
+  ipc.on('directory-path', function(event, arg) {
+    var targetDirectory = arg;
+    browserSync({
+        server: {
+          baseDir: targetDirectory
+        },
+        files: [targetDirectory + "/*.html", targetDirectory + "/*.css"]
+    });
+  });
+  // Start the server once you grab the directory
+  
 
   ipc.on('reload', function(event) {
     mainWindow.reload();

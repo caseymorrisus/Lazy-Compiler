@@ -104,9 +104,12 @@
 				var directorypath = '' + fs.readFileSync(appdirectory + '/.directory') + '';
 				$('#holder').text('');
 				$('#holder').append('<strong>Currently Watching:</strong><br>').append(directorypath);
+				ipc.send('directory-path', directorypath);
 			} catch(err) {
 				console.log("No directory set yet.");
 			}
+
+			
 
 			console.log('DIRECTORY FILE CONTENTS: ' + directorypath);
 			var holder = document.getElementById('holder');
@@ -167,8 +170,8 @@
 			switch(key) {
 				case 'css':
 					if(options.minify) {
-						gaze([value, '!' + directorypath + '/*.min*'], function(err, watcher) {
-							this.on('changed', function(filepath) {
+						gaze([value, '!' + directorypath + '/*.min*'],{cwd: './'}, function(err, watcher) {
+							this.on('all', function(filepath) {
 								console.log("\n\nCSS FILE WAS ADDED.\n\n")
 								var fileName = pathlib.basename(filepath, '.css');
 								var fileDir = pathlib.dirname(filepath);
@@ -183,7 +186,7 @@
 					break;
 				case 'scss':
 					gaze(value, function(err, watcher) {
-						this.on('changed', function(filepath) {
+						this.on('all', function(filepath) {
 							console.log("SCSS / SASS File Changed");
 							var fileName = pathlib.basename(filepath, '.scss');
 							var fileDir = pathlib.dirname(filepath);
@@ -205,7 +208,7 @@
 					break;
 				case 'less':
 					gaze(value, function(err, watcher) {
-						this.on('changed', function(filepath) {
+						this.on('all', function(filepath) {
 							var fileName = pathlib.basename(filepath, '.less');
 							var fileDir = pathlib.dirname(filepath);
 							less.render(fs.readFileSync(filepath).toString(), {
@@ -223,7 +226,7 @@
 					break;
 				case 'styl':
 					gaze(value, function(err, watcher) {
-						this.on('changed', function(filepath) {
+						this.on('all', function(filepath) {
 							var fileName = pathlib.basename(filepath, '.styl');
 							var fileDir = pathlib.dirname(filepath);
 							shell.cd(fileDir);
@@ -244,7 +247,7 @@
 					break;
 				case 'jade':
 					gaze(value, function(err, watcher) {
-						this.on('changed', function(filepath) {
+						this.on('all', function(filepath) {
 							var fileName = pathlib.basename(filepath, '.jade');
 							var fileDir = pathlib.dirname(filepath);
 							console.log("JADE File Changed");
@@ -286,73 +289,6 @@
 
 		});
 		
-
-		/*chokidar.watch(directorypath, {ignored: /[\/\\]\./}).on('change', function(event, path) {
-			var ext = pathlib.extname(event);
-			var filename = pathlib.basename(event);
-			var base = pathlib.basename(event, ext);
-			//console.log("Base: " + base);
-			var secondbase = pathlib.basename(base, '.min');
-			//console.log('Second base: ' + secondbase);
-			if (base == secondbase) {
-				switch(ext) {
-					case '.css':
-						console.log("CSS File Changed");
-						shell.cd(directorypath);
-						var css = fs.readFileSync(directorypath + '/' + filename, 'utf8');
-						fs.writeFileSync(directorypath + '/' + base + '.min.css', csswring.wring(css).css);
-						ipc.send('reload');
-						break;
-					case '.scss':
-						console.log("SCSS / SASS File Changed");
-						shell.cd(directorypath);
-						shell.mkdir('something');
-						shell.exec('node-sass ' + directorypath + '/' + filename + ' ' + directorypath + '/' + base + '.css', {async: true}, function(code, output) {
-							if(code == 0) {
-								ipc.send('reload');
-							} else {
-								console.log("Please install Node-Sass using npm install -g node-sass");
-							}
-						});
-						break;
-					case '.less':
-						var src = "Electron.app/Contents/Resources/app/lesstest.less";
-						less.render(fs.readFileSync(src).toString(), {
-							filename: pathlib.resolve(src),
-						}, function(e,output) {
-							fs.writeFileSync('Electron.app/Contents/Resources/app/lesstest.css', output.css);
-						});
-						break;
-					case '.jade':
-						console.log("JADE File Changed");
-						shell.cd('Electron.app/Contents/Resources/app');
-						shell.mkdir('something');
-						shell.exec('jade test.jade', {async: true}, function(code, output) {
-							if(code == 0) {
-								ipc.send('reload');
-							} else {
-								console.log("Please install Jade using npm install -g jade");
-							}
-						});
-						break;
-					case '.html':
-						ipc.send('reload');
-						break;
-					case '.styl':
-						shell.cd('Electron.app/Contents/Resources/app');
-						shell.mkdir('something');
-						shell.exec('stylus test.styl', {async: true}, function(code, output) {
-							if(code == 0) {
-								ipc.send('reload');
-							} else {
-								console.log("Please install Stylus using npm install -g stylus");
-							}
-						});
-						break;
-				}
-			}
-			
-		});*/
 
 		var closeBtn = document.getElementById('close');
 		closeBtn.addEventListener('click', function() {
